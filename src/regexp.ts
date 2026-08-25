@@ -55,8 +55,8 @@ export class BSONRegExp extends BSONValue {
 
     // Validate options
     for (let i = 0; i < this.options.length; i++) {
-      /* eslint-disable prettier/prettier */
       if (
+      /* eslint-disable prettier/prettier */
         !(
           this.options[i] === 'i' ||
           this.options[i] === 'm' ||
@@ -64,8 +64,8 @@ export class BSONRegExp extends BSONValue {
           this.options[i] === 'l' ||
           this.options[i] === 's' ||
           this.options[i] === 'u'
-      /* eslint-disable prettier/prettier */
         )
+      /* eslint-enable prettier/prettier */
       ) {
         throw new BSONError(`The regular expression option [${this.options[i]}] is not supported`);
       }
