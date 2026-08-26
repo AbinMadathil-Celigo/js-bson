@@ -61,6 +61,20 @@ describe('parseToElements()', () => {
     });
   });
 
+  context('when a string element declares a zero length (NODE-7611)', () => {
+    it('throws instead of scanning past the end of the input', () => {
+      // 10-byte document: string element with empty name declares a stringSize of 0,
+      // which advances the cursor to the declared document end and would otherwise
+      // make findNull scan out of range forever.
+      const test = () =>
+        parseToElements(
+          new Uint8Array([0x0a, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
+        );
+      expect(test).to.throw(/Null terminator not found/i);
+      expect(test).to.throw(BSONOffsetError);
+    });
+  });
+
   context('when given a negative size', () => {
     context('in a document', () => {
       it('throws an error that a size cannot be negative', () => {
