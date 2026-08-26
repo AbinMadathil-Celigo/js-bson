@@ -518,6 +518,14 @@ export function validateBinaryVector(vector: Binary): void {
 
   const size = vector.position;
 
+  // Every subtype-9 vector carries two metadata bytes (datatype and padding):
+  // the typed helpers always allocate them, but the raw constructor path may not (NODE-7612)
+  if (size < 2) {
+    throw new BSONError(
+      'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+    );
+  }
+
   // NOTE: Validation is only applied to **KNOWN** vector types
   // If a new datatype is introduced, a future version of the library will need to add validation
   const datatype = vector.buffer[0];

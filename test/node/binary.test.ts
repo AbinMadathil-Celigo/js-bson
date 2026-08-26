@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import * as vm from 'node:vm';
-import { __isWeb__, Binary, BSON, BSONError, UUID } from '../register-bson';
+import { __isWeb__, Binary, BSON, BSONError, EJSON, UUID } from '../register-bson';
 import * as util from 'node:util';
 
 describe('class Binary', () => {
@@ -534,6 +534,38 @@ describe('class Binary', () => {
 
       it('throws when values are not 1 or 0', () => {
         expect(() => Binary.fromBits([1, 0, 2])).to.throw(BSONError, /must be 0 or 1/);
+      });
+    });
+
+    describe('validateBinaryVector()', () => {
+      it('throws when a vector constructed from raw bytes has no datatype or padding bytes (NODE-7612)', () => {
+        const binary = new Binary(new Uint8Array(0), Binary.SUBTYPE_VECTOR);
+        expect(() => BSON.serialize({ bin: binary })).to.throw(
+          BSONError,
+          'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+        );
+        expect(() => EJSON.stringify({ bin: binary })).to.throw(
+          BSONError,
+          'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+        );
+      });
+
+      it('throws when a vector has a datatype byte but no padding byte (NODE-7612)', () => {
+        const binary = new Binary(
+          new Uint8Array([Binary.VECTOR_TYPE.PackedBit]),
+          Binary.SUBTYPE_VECTOR
+        );
+        expect(() => BSON.serialize({ bin: binary })).to.throw(
+          BSONError,
+          'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+        );
+      });
+
+      it('still accepts metadata-only vectors created by the typed helpers', () => {
+        const binary = Binary.fromInt8Array(new Int8Array(0));
+        expect(binary.buffer).to.have.lengthOf(2);
+        expect(() => BSON.serialize({ bin: binary })).to.not.throw();
+        expect(() => EJSON.stringify({ bin: binary })).to.not.throw();
       });
     });
   });
