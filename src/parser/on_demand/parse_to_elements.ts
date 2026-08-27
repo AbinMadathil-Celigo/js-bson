@@ -182,7 +182,10 @@ export function parseToElements(
       );
     }
 
-    if (length > documentSize) {
+    // The value must fit within the current document: the document's last byte
+    // (startOffset + documentSize - 1) is its null terminator, so a value may
+    // extend at most up to that byte.
+    if (offset + length > startOffset + documentSize - 1) {
       throw new BSONOffsetError('value reports length larger than document', offset);
     }
 
