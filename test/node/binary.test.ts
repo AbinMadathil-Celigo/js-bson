@@ -551,21 +551,74 @@ describe('class Binary', () => {
       });
 
       it('throws when a vector has a datatype byte but no padding byte (NODE-7612)', () => {
-        const binary = new Binary(
-          new Uint8Array([Binary.VECTOR_TYPE.PackedBit]),
-          Binary.SUBTYPE_VECTOR
+        for (const dtype of [
+          Binary.VECTOR_TYPE.Int8,
+          Binary.VECTOR_TYPE.Float32,
+          Binary.VECTOR_TYPE.PackedBit
+        ]) {
+          const binary = new Binary(new Uint8Array([dtype]), Binary.SUBTYPE_VECTOR);
+          expect(() => BSON.serialize({ bin: binary })).to.throw(
+            BSONError,
+            'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+          );
+        }
+      });
+
+      it('throws when a zero-length vector is read from the wire and re-serialized (NODE-7612)', () => {
+        // { bin: <binary size=0, subtype=0x09> } — malformed vector on the wire.
+        // Deserialization is lazy and does not validate vector content, but the
+        // malformed value must not round-trip silently through serialization.
+        const wireBytes = new Uint8Array([
+          0x0f,
+          0x00,
+          0x00,
+          0x00, // document size = 15
+          0x05, // type: binary
+          0x62,
+          0x69,
+          0x6e,
+          0x00, // name 'bin'
+          0x00,
+          0x00,
+          0x00,
+          0x00, // binary size = 0
+          0x09, // subtype = 9 (vector)
+          0x00 // document terminator
+        ]);
+        const doc = BSON.deserialize(wireBytes);
+        expect(doc.bin.position).to.equal(0);
+        expect(() => BSON.serialize(doc)).to.throw(
+          BSONError,
+          'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
         );
-        expect(() => BSON.serialize({ bin: binary })).to.throw(
+        expect(() => EJSON.stringify(doc)).to.throw(
+          BSONError,
+          'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+        );
+      });
+
+      it('throws when a zero-length vector comes from EJSON input (NODE-7612)', () => {
+        const doc = EJSON.parse('{"bin":{"$binary":{"base64":"","subType":"9"}}}');
+        expect(() => EJSON.stringify(doc)).to.throw(
+          BSONError,
+          'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
+        );
+        expect(() => BSON.serialize(doc)).to.throw(
           BSONError,
           'Invalid Vector: must be at least 2 bytes to hold the datatype and padding bytes'
         );
       });
 
       it('still accepts metadata-only vectors created by the typed helpers', () => {
-        const binary = Binary.fromInt8Array(new Int8Array(0));
-        expect(binary.buffer).to.have.lengthOf(2);
-        expect(() => BSON.serialize({ bin: binary })).to.not.throw();
-        expect(() => EJSON.stringify({ bin: binary })).to.not.throw();
+        for (const binary of [
+          Binary.fromInt8Array(new Int8Array(0)),
+          Binary.fromFloat32Array(new Float32Array(0)),
+          Binary.fromPackedBits(new Uint8Array(0), 0)
+        ]) {
+          expect(binary.buffer).to.have.lengthOf(2);
+          expect(() => BSON.serialize({ bin: binary })).to.not.throw();
+          expect(() => EJSON.stringify({ bin: binary })).to.not.throw();
+        }
       });
     });
   });
